@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import final
+from typing import Final
 
 from fgrad.topo import topo_sort
 
 
-@dataclass(frozen=True)
+@dataclass(eq=False, repr=False)
 class Value:
     data: float
-    children: tuple[Value, ...]
+    children: Final[tuple[Value, ...]]
 
     # could be moved to a separate class Const
     @classmethod
@@ -52,44 +52,48 @@ class Value:
     def __rtruediv__(self, other: Value | float) -> Value:
         return other * self ** (-1)
 
-@final
-@dataclass(frozen=True)
+    def __repr__(self):
+        return f"Value({self.data})"
+
+
+@dataclass(eq=False, repr=False)
 class Add(Value):
-    a: Value
-    b: Value
+    a: Final[Value]
+    b: Final[Value]
 
     @classmethod
-    def construct(cls, a: Value, b: Value) -> Value:
+    def construct(cls, a: Value, b: Value) -> Add:
         return cls(a.data + b.data, (a, b), a, b)
 
-@final
-@dataclass(frozen=True)
+
+@dataclass(eq=False, repr=False)
 class Mult(Value):
-    a: Value
-    b: Value
+    a: Final[Value]
+    b: Final[Value]
 
     @classmethod
-    def construct(cls, a: Value, b: Value) -> Value:
+    def construct(cls, a: Value, b: Value) -> Mult:
         return cls(a.data * b.data, (a, b), a, b)
 
-@final
-@dataclass(frozen=True)
+
+@dataclass(eq=False, repr=False)
 class Pow(Value):
-    a: Value
-    power: float | int
+    a: Final[Value]
+    power: Final[float | int]
 
     @classmethod
-    def construct(cls, a: Value, power: float | int) -> Value:
+    def construct(cls, a: Value, power: float | int) -> Pow:
         return cls(a.data ** power, (a,), a, power)
 
-@final
-@dataclass(frozen=True)
+
+@dataclass(eq=False, repr=False)
 class Relu(Value):
-    a: Value
+    a: Final[Value]
 
     @classmethod
-    def construct(cls, a: Value) -> Value:
+    def construct(cls, a: Value) -> Relu:
         return cls(a.data if a.data > 0 else 0.0, (a,), a)
+
 
 def backward(y: Value) -> dict[Value, float]:
     grads: dict[Value, float] = defaultdict(float)
@@ -104,7 +108,7 @@ def backward(y: Value) -> dict[Value, float]:
                 grads[a] += b.data * grads[u]
                 grads[b] += a.data * grads[u]
             case Pow(_, _, a, power):
-                grads[a] += power * a.data ** (power-1) * grads[u]
+                grads[a] += power * a.data ** (power - 1) * grads[u]
             case Relu(_, _, a):
                 grads[a] += grads[u] if u.data > 0.0 else 0
 

@@ -7,7 +7,6 @@ from typing import final
 from fgrad.topo import topo_sort
 
 
-@final
 @dataclass(frozen=True)
 class Value:
     data: float
@@ -26,14 +25,32 @@ class Value:
         other = other if isinstance(other, Value) else Value.from_data(other)
         return Mult.construct(self, other)
 
-    def __radd__(self, other):
-        return self + other
-
-    def __rmul__(self, other):
-        return self * other
+    def __pow__(self, power: int | float) -> Value:
+        return Pow.construct(self, power)
 
     def relu(self) -> Value:
         return Relu.construct(self)
+
+    def __neg__(self) -> Value:
+        return self * -1
+
+    def __radd__(self, other: Value | float) -> Value:
+        return self + other
+
+    def __sub__(self, other: Value | float) -> Value:
+        return self + (-other)
+
+    def __rsub__(self, other: Value | float) -> Value:
+        return other + (-self)
+
+    def __rmul__(self, other: Value | float) -> Value:
+        return self * other
+
+    def __truediv__(self, other: Value | float) -> Value:
+        return self * other ** (-1)
+
+    def __rtruediv__(self, other: Value | float) -> Value:
+        return other * self ** (-1)
 
 @final
 @dataclass(frozen=True)
@@ -57,6 +74,16 @@ class Mult(Value):
 
 @final
 @dataclass(frozen=True)
+class Pow(Value):
+    a: Value
+    power: float | int
+
+    @classmethod
+    def construct(cls, a: Value, power: float | int) -> Value:
+        return cls(a.data ** power, (a,), a, power)
+
+@final
+@dataclass(frozen=True)
 class Relu(Value):
     a: Value
 
@@ -76,8 +103,10 @@ def backward(y: Value) -> dict[Value, float]:
             case Mult(_, _, a, b):
                 grads[a] += b.data * grads[u]
                 grads[b] += a.data * grads[u]
+            case Pow(_, _, a, power):
+                grads[a] += power * a.data ** (power-1) * grads[u]
             case Relu(_, _, a):
-                grads[a] += grads[u] if grads[u] > 0.0 else 0
+                grads[a] += grads[u] if u.data > 0.0 else 0
 
     for v in topo_sort(y, lambda u: u.children):
         _backward(v)
